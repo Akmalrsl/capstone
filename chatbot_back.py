@@ -1,23 +1,26 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 import mysql.connector
 import re
 import requests
 from collections import defaultdict
+from typing import Dict, List, DefaultDict, Any
 
 app = Flask(__name__)
 CORS(app)
-llm = Ollama(model="phi:latest")
+
+llm = OllamaLLM(model="phi:latest")
 
 NUTRITIONIX_APP_ID = "39ced4d8"
 NUTRITIONIX_API_KEY = "dc80bad1093e3611d655bb6f0f0b4579"
 
-chat_history = defaultdict(list)  # session_id -> list of messages
-latest_meal_plan = defaultdict(str)  # session_id -> last meal plan response
+chat_history: DefaultDict[str, List[Dict[str, str]]] = defaultdict(list)
+latest_meal_plan: DefaultDict[str, str] = defaultdict(str)
 
+from typing import cast, Dict, Any, Optional
 
-def get_user_from_db(user_id):
+def get_user_from_db(user_id: int) -> Optional[Dict[str, Any]]:
     conn = mysql.connector.connect(
         host="capstonespring2025.duckdns.org",
         port=3306,
@@ -27,13 +30,13 @@ def get_user_from_db(user_id):
     )
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM health_data WHERE id = %s", (user_id,))
-    result = cursor.fetchone()
+    result = cast(Optional[Dict[str, Any]], cursor.fetchone())
     cursor.close()
     conn.close()
     return result
 
 
-def build_prompt(user):
+def build_prompt(user: Dict[str, Any]) -> str:
     return f"""
 You are a certified nutritionist chatbot.
 
@@ -63,12 +66,11 @@ Supper:
 Do not include explanations, quantities, or numbers. Only return the food names.
 """
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_input = data.get("message", "").strip()
-    session_id = "default"
+    data: Dict[str, Any] = request.get_json()
+    user_input: str = data.get("message", "").strip()
+    session_id: str = "default"
 
     if not user_input:
         return jsonify({"reply": "Invalid input."}), 400
@@ -86,23 +88,24 @@ def chat():
 
     match = re.search(r'id (\d+)', user_input.lower())
     if match:
-        user_id = match.group(1)
+        user_id: int = int(match.group(1))
         user_data = get_user_from_db(user_id)
         if not user_data:
             return jsonify({"reply": "No user found with that ID."})
 
         prompt = build_prompt(user_data)
-        raw_plan = llm.invoke(prompt)
+        raw_plan: str = llm.invoke(prompt)
         sections = re.split(r"(Breakfast:|Lunch:|Dinner:|Supper:)", raw_plan)
 
-        meal_items_by_section = {}
+        meal_items_by_section: Dict[str, List[str]] = {}
         for i in range(1, len(sections), 2):
             label = sections[i].strip()
             items_block = sections[i + 1].strip()
             lines = [line.strip("- ").strip() for line in items_block.splitlines() if line.strip()]
             meal_items_by_section[label] = lines
 
-        all_items = [item for sublist in meal_items_by_section.values() for item in sublist]
+        all_items: List[str] = [item for sublist in meal_items_by_section.values() for item in sublist]
+
         nutri_resp = requests.post(
             "https://trackapi.nutritionix.com/v2/natural/nutrients",
             headers={
@@ -120,14 +123,14 @@ def chat():
         for label, items in meal_items_by_section.items():
             final_reply += f"{label}::\n"
             for item in items:
-                match = next((f for f in foods_data if f["food_name"].lower() in item.lower()), None)
-                if match:
-                    kcal = round(match["nf_calories"])
-                    total_cal += match["nf_calories"]
-                    carbs += match.get("nf_total_carbohydrate", 0)
-                    protein += match.get("nf_protein", 0)
-                    fat += match.get("nf_total_fat", 0)
-                    final_reply += f"- {match['food_name'].capitalize()} ({kcal} kcal)\n"
+                match_food = next((f for f in foods_data if f["food_name"].lower() in item.lower()), None)
+                if match_food:
+                    kcal = round(match_food["nf_calories"])
+                    total_cal += match_food["nf_calories"]
+                    carbs += match_food.get("nf_total_carbohydrate", 0)
+                    protein += match_food.get("nf_protein", 0)
+                    fat += match_food.get("nf_total_fat", 0)
+                    final_reply += f"- {match_food['food_name'].capitalize()} ({kcal} kcal)\n"
                 else:
                     final_reply += f"- {item} (? kcal)\n"
             final_reply += "\n"
@@ -141,8 +144,9 @@ def chat():
         latest_meal_plan[session_id] = final_reply.strip()
         return jsonify({"reply": final_reply.strip()})
 
-    # --- context-aware ---
+    # Context-aware chat
     chat_history[session_id].append({"role": "user", "content": user_input})
+
     if latest_meal_plan[session_id] and "replace" in user_input.lower():
         context_prompt = (
             "You are a nutritionist assistant.\n"
@@ -160,7 +164,7 @@ def chat():
             context_prompt += f"{msg['role'].capitalize()}: {msg['content']}\n"
         context_prompt += "Assistant:"
 
-    response = llm.invoke(context_prompt)
+    response: str = llm.invoke(context_prompt)
     chat_history[session_id].append({"role": "assistant", "content": response})
     return jsonify({"reply": response})
 
