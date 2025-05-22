@@ -1,6 +1,6 @@
 <?php
 session_start();
-
+//testing123
 //Login required
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
