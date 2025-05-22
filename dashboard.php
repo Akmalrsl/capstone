@@ -128,7 +128,7 @@ include 'db_connect.php';
                     <div class="feature-card">
                         <h5>AI Nutritionist Chatbot</h5>
                         <p>Talk to an AI for dietary guidance.</p>
-                        <a href="http://localhost:8501" target="_blank" class="btn btn-primary mt-2">Start Chat</a>
+                        <a href="http://localhost/capstone/chatbot_front.php" target="_blank" class="btn btn-primary mt-2">Start Chat</a>
                     </div>
                 </div>
 
