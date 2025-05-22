@@ -135,7 +135,8 @@ include 'db_connect.php';
                 <div class="col-md-4">
                     <div class="feature-card">
                         <h5>Health Insights</h5>
-                        <p>Coming soon: Personalized insights from your health data!</p>
+                        <p>Personalized insights from your health data!</p>
+                        <a href="healthInsights.php"  class="btn btn-primary mt-2">Start Chat</a>
                     </div>
                 </div>
             </div>
