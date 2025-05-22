@@ -1,9 +1,4 @@
 <!DOCTYPE html>
-<?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-?>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -15,7 +10,6 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
             background-color: #f8f9fa;
             padding: 20px;
         }
-
         .chart-container {
             background-color: white;
             border-radius: 10px;
@@ -23,19 +17,31 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
             padding: 20px;
             margin-bottom: 30px;
         }
-
         canvas {
             width: 100% !important;
             height: auto !important;
         }
-
         .btn-container {
             text-align: center;
             margin-top: 30px;
         }
-
         .btn-container button {
             margin: 10px;
+        }
+        .timer-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .average-container {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 1.1rem;
+            color: #0d6efd;
         }
     </style>
 </head>
@@ -43,23 +49,31 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
     <div class="container">
         <h2 class="mb-4 text-center">Live Sensor Data</h2>
 
+        <div class="timer-container">
+            <span id="timer" class="timer">01:00</span>
+        </div>
+        
+        
         <div class="chart-container">
-            <h5>PCG Sensor</h5>
-            <canvas id="pcgChart" width="800" height="250"></canvas>
+            <h5>PPG Sensor (mg/dL)</h5>
+            <canvas id="ppgChart" width="800" height="250"></canvas>
+            <div class="average-container">
+                Average: <span id="ppgAvg">0</span>
+            </div>
         </div>
 
         <div class="chart-container">
-            <h5>ECG Sensor</h5>
+            <h5>ECG Sensor (bpm)</h5>
             <canvas id="ecgChart" width="800" height="250"></canvas>
+            <div class="average-container">
+                Average: <span id="ecgAvg">0</span>
+            </div>
         </div>
 
-        <div class="chart-container">
-            <h5>GSR Sensor</h5>
-            <canvas id="gsrChart" width="800" height="250"></canvas>
-        </div>
-
+        <!-- Buttons at the bottom -->
         <div class="btn-container">
             <button id="startBtn" class="btn btn-success">Start Streaming</button>
+            <button id="stopBtn" class="btn btn-danger">Stop Streaming</button>
             <button id="downloadBtn" class="btn btn-primary" onclick="downloadCSV()">Download CSV</button>
         </div>
     </div>
@@ -68,6 +82,15 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
         const sensorData = [];
         let timeIndex = 0;
         let streamStarted = false;
+        let socket = null;
+
+        // Timer variables
+        let timerInterval = null;
+        let timerSeconds = 60; // 1 minute
+
+        // Running sums and counts for averages
+        let ppgSum = 0, ppgCount = 0;
+        let ecgSum = 0, ecgCount = 0;
 
         function fixCanvasHD(canvas) {
             const ctx = canvas.getContext('2d');
@@ -121,9 +144,8 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
             });
         }
 
-        const pcgChart = createChart("pcgChart", "PCG", "blue");
+        const ppgChart = createChart("ppgChart", "PPG", "blue");
         const ecgChart = createChart("ecgChart", "ECG", "green");
-        const gsrChart = createChart("gsrChart", "GSR", "red");
 
         function addData(chart, x, y) {
             chart.data.labels.push(x);
@@ -137,46 +159,96 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
             chart.update("none");
         }
 
+        function setButtonStates() {
+            document.getElementById("startBtn").disabled = streamStarted;
+            document.getElementById("stopBtn").disabled = !streamStarted;
+        }
+
+        function formatTime(seconds) {
+            const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const s = String(seconds % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById("timer").textContent = formatTime(timerSeconds);
+        }
+
+        function updateAverages() {
+            document.getElementById("ppgAvg").textContent = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
+            document.getElementById("ecgAvg").textContent = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
+        }
+
+        function startTimer() {
+            timerSeconds = 60;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                updateTimerDisplay();
+                if (timerSeconds <= 0) {
+                    stopStream();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
         function startStream() {
             if (streamStarted) return;
             streamStarted = true;
+            setButtonStates();
+            startTimer();
 
-            fetch("http://127.0.0.1:8000/stream-pcg")
-                .then(response => response.body.getReader())
-                .then(reader => {
-                    const decoder = new TextDecoder("utf-8");
+            socket = new WebSocket("ws://127.0.0.1:8000");
 
-                    function read() {
-                        reader.read().then(({ done, value }) => {
-                            if (done) return console.log("Stream closed.");
+            socket.onmessage = (event) => {
+                const line = event.data.trim(); // Expected format: "512,450,100"
+                const [ppg, ecg] = line.split(",").map(Number);
 
-                            const text = decoder.decode(value);
-                            const lines = text.trim().split("\n");
+                addData(ppgChart, timeIndex, ppg);
+                addData(ecgChart, timeIndex, ecg);
 
-                            lines.forEach(line => {
-                                const [pcg, ecg, gsr] = line.split(",").map(parseFloat);
-                                addData(pcgChart, timeIndex, pcg);
-                                addData(ecgChart, timeIndex, ecg);
-                                addData(gsrChart, timeIndex, gsr);
+                sensorData.push({ time: timeIndex, ppg, ecg });
+                timeIndex++;
 
-                                sensorData.push({ time: timeIndex, pcg, ecg, gsr });
+                // Update running sums and counts
+                ppgSum += ppg;
+                ppgCount++;
+                ecgSum += ecg;
+                ecgCount++;
+                updateAverages();
 
-                                timeIndex++;
-                            });
+                
+            };
 
-                            requestAnimationFrame(read);
-                        });
-                    }
+            socket.onerror = (err) => {
+                console.error("WebSocket error:", err);
+            };
 
-                    read();
-                })
-                .catch(err => console.error("Stream error:", err));
+            socket.onclose = () => {
+                console.warn("WebSocket closed.");
+                streamStarted = false;
+                setButtonStates();
+                stopTimer();
+            };
+        }
+
+        function stopStream() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+            streamStarted = false;
+            setButtonStates();
+            stopTimer();
         }
 
         function downloadCSV() {
             const rows = [
-                ["Time(ms)", "PCG", "ECG", "GSR"],
-                ...sensorData.map(d => [d.time, d.pcg, d.ecg, d.gsr])
+                ["Time(ms)", "PPG", "ECG"],
+                ...sensorData.map(d => [d.time, d.ppg, d.ecg])
             ];
 
             const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
@@ -191,6 +263,12 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
         }
 
         document.getElementById("startBtn").addEventListener("click", startStream);
+        document.getElementById("stopBtn").addEventListener("click", stopStream);
+
+        // Set initial button states, timer, and averages on page load
+        setButtonStates();
+        updateTimerDisplay();
+        updateAverages();
     </script>
 </body>
 </html>
