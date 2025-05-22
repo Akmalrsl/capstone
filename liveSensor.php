@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Live Sensor Graphs</title>
@@ -10,6 +11,7 @@
             background-color: #f8f9fa;
             padding: 20px;
         }
+
         .chart-container {
             background-color: white;
             border-radius: 10px;
@@ -17,26 +19,32 @@
             padding: 20px;
             margin-bottom: 30px;
         }
+
         canvas {
             width: 100% !important;
             height: auto !important;
         }
+
         .btn-container {
             text-align: center;
             margin-top: 30px;
         }
+
         .btn-container button {
             margin: 10px;
         }
+
         .timer-container {
             text-align: center;
             margin-bottom: 20px;
         }
+
         .timer {
             font-size: 2rem;
             font-weight: bold;
             color: #dc3545;
         }
+
         .average-container {
             text-align: center;
             margin-top: 10px;
@@ -45,6 +53,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h2 class="mb-4 text-center">Live Sensor Data</h2>
@@ -52,8 +61,8 @@
         <div class="timer-container">
             <span id="timer" class="timer">01:00</span>
         </div>
-        
-        
+
+
         <div class="chart-container">
             <h5>PPG Sensor (mg/dL)</h5>
             <canvas id="ppgChart" width="800" height="250"></canvas>
@@ -74,7 +83,7 @@
         <div class="btn-container">
             <button id="startBtn" class="btn btn-success">Start Streaming</button>
             <button id="stopBtn" class="btn btn-danger">Stop Streaming</button>
-            <button id="downloadBtn" class="btn btn-primary" onclick="downloadCSV()">Download CSV</button>
+            <button id="submitBtn" class="btn btn-primary" onclick="submitAverages()">Submit</button>
         </div>
     </div>
 
@@ -89,8 +98,10 @@
         let timerSeconds = 60; // 1 minute
 
         // Running sums and counts for averages
-        let ppgSum = 0, ppgCount = 0;
-        let ecgSum = 0, ecgCount = 0;
+        let ppgSum = 0,
+            ppgCount = 0;
+        let ecgSum = 0,
+            ecgCount = 0;
 
         function fixCanvasHD(canvas) {
             const ctx = canvas.getContext('2d');
@@ -149,7 +160,10 @@
 
         function addData(chart, x, y) {
             chart.data.labels.push(x);
-            chart.data.datasets[0].data.push({ x, y });
+            chart.data.datasets[0].data.push({
+                x,
+                y
+            });
 
             if (chart.data.labels.length > 2000) {
                 chart.data.labels.shift();
@@ -211,7 +225,11 @@
                 addData(ppgChart, timeIndex, ppg);
                 addData(ecgChart, timeIndex, ecg);
 
-                sensorData.push({ time: timeIndex, ppg, ecg });
+                sensorData.push({
+                    time: timeIndex,
+                    ppg,
+                    ecg
+                });
                 timeIndex++;
 
                 // Update running sums and counts
@@ -221,7 +239,7 @@
                 ecgCount++;
                 updateAverages();
 
-                
+
             };
 
             socket.onerror = (err) => {
@@ -245,22 +263,62 @@
             stopTimer();
         }
 
-        function downloadCSV() {
-            const rows = [
-                ["Time(ms)", "PPG", "ECG"],
-                ...sensorData.map(d => [d.time, d.ppg, d.ecg])
-            ];
+        /*function submitAverages() {
+            const ppgAverage = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
+            const ecgAverage = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
 
-            const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            // Prepare data to send
+            const data = {
+                ppgAverage: ppgAverage,
+                ecgAverage: ecgAverage
+            };
 
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "sensor_data.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Example: POST to /submit-averages (adjust URL as needed)
+            fetch('/submit-averages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Averages submitted successfully!');
+                    } else {
+                        alert('Failed to submit averages.');
+                    }
+                })
+                .catch(error => {
+                    alert('Error submitting averages: ' + error);
+                });
+        }*/
+
+        function submitAverages() {
+            const ppgAverage = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
+            const ecgAverage = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
+
+            // Prepare data to send
+            const data = {
+                ppgAverage: ppgAverage,
+                ecgAverage: ecgAverage
+            };
+
+            fetch('http://capstonespring2025.duckdns.org:8080/capstonepanel2025/upload.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.text())
+                .then(result => {
+                    alert(result);
+                })
+                .catch(error => {
+                    alert('Error submitting averages: ' + error);
+                });
         }
+
 
         document.getElementById("startBtn").addEventListener("click", startStream);
         document.getElementById("stopBtn").addEventListener("click", stopStream);
@@ -271,4 +329,5 @@
         updateAverages();
     </script>
 </body>
+
 </html>
