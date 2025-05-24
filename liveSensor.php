@@ -304,6 +304,7 @@
             };
 
             fetch('http://capstonespring2025.duckdns.org:8080/capstonepanel2025/upload.php', {
+                
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
