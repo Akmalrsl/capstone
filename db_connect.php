@@ -13,9 +13,3 @@ if ($health_conn->connect_error) {
 // ✅ Alias for compatibility with login.php
 $conn = $health_conn;
 
-// Connect to capstone_sensors database
-$sensor_conn = new mysqli($servername, $username, $password, "capstone_sensors", $port);
-if ($sensor_conn->connect_error) {
-    die("Connection to capstone_sensors failed: " . $sensor_conn->connect_error);
-}
-?>
