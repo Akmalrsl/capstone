@@ -3,7 +3,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
-//Use online DB connection
+//Use online DB connection 
 include 'db_connect.php';
 
 //Set headers to force download as CSV
