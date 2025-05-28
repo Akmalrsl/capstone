@@ -92,7 +92,7 @@ $stats = $statsResult->fetch_assoc();
 $riskQuery = "SELECT age, gender, systolicbp, diastolicbp, cholesterol_level 
               FROM health_data 
               WHERE (systolicbp > 130 OR diastolicbp > 90) 
-              AND systolicbp IS NOT NULL AND diastolicbp IS NOT NULL";
+              AND (systolicbp IS NOT NULL OR diastolicbp IS NOT NULL)";
 
 if ($role !== 'admin') {
     $riskQuery .= " AND DATE(date_created) >= CURDATE() - INTERVAL 7 DAY";
@@ -260,7 +260,7 @@ $health_conn->close();
     </div>
 
     <div class="summary-box">
-        <h5 class="text-danger">⚠ High-Risk Users (Systolic > 130 or Diastolic > 90)</h5>
+        <h5 class="text-danger">⚠ Potential High-Risk Users (Systolic > 130 or Diastolic > 90)</h5>
         <?php if (count($highRiskUsers) > 0): ?>
             <table class="table table-bordered table-striped">
                 <thead class="table-dark">
@@ -277,9 +277,9 @@ $health_conn->close();
                         <tr>
                             <td><?= $user['age'] ?></td>
                             <td><?= ucfirst($user['gender']) ?></td>
-                            <td class="text-danger fw-bold"><?= $user['systolicbp'] ?></td>
-                            <td class="text-danger fw-bold"><?= $user['diastolicbp'] ?></td>
-                            <td><?= $user['cholesterol_level'] ?></td>
+                            <td class="text-danger fw-bold"><?= $user['systolicbp'] !== null ? $user['systolicbp'] : 'NULL' ?></td>
+                            <td class="text-danger fw-bold"><?= $user['diastolicbp'] !== null ? $user['diastolicbp'] : 'NULL' ?></td>
+                            <td><?= $user['cholesterol_level'] !== null ? $user['cholesterol_level'] : 'NULL' ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
