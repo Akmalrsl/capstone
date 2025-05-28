@@ -62,15 +62,6 @@
             <span id="timer" class="timer">01:00</span>
         </div>
 
-
-        <div class="chart-container">
-            <h5>PPG Sensor (mg/dL)</h5>
-            <canvas id="ppgChart" width="800" height="250"></canvas>
-            <div class="average-container">
-                Average: <span id="ppgAvg">0</span>
-            </div>
-        </div>
-
         <div class="chart-container">
             <h5>ECG Sensor (bpm)</h5>
             <canvas id="ecgChart" width="800" height="250"></canvas>
@@ -79,7 +70,7 @@
             </div>
         </div>
 
-        <!-- Buttons at the bottom -->
+        <!-- Buttons -->
         <div class="btn-container">
             <button id="startBtn" class="btn btn-success">Start Streaming</button>
             <button id="stopBtn" class="btn btn-danger">Stop Streaming</button>
@@ -95,13 +86,9 @@
 
         // Timer variables
         let timerInterval = null;
-        let timerSeconds = 60; // 1 minute
+        let timerSeconds = 60;
 
-        // Running sums and counts for averages
-        let ppgSum = 0,
-            ppgCount = 0;
-        let ecgSum = 0,
-            ecgCount = 0;
+        let ecgSum = 0, ecgCount = 0;
 
         function fixCanvasHD(canvas) {
             const ctx = canvas.getContext('2d');
@@ -136,7 +123,20 @@
                             type: "linear",
                             title: {
                                 display: true,
-                                text: "Time (ms)"
+                                text: "Time (s)"
+                            },
+                            ticks: {
+                                callback: function (value) {
+                                    return (value / 100).toFixed(1) + 's';
+                                }
+                            },
+                            min: (ctx) => {
+                                const d = ctx.chart.data.datasets[0].data;
+                                return d.length > 0 ? d[d.length - 1].x - 300 : 0;
+                            },
+                            max: (ctx) => {
+                                const d = ctx.chart.data.datasets[0].data;
+                                return d.length > 0 ? d[d.length - 1].x : 0;
                             }
                         },
                         y: {
@@ -155,17 +155,13 @@
             });
         }
 
-        const ppgChart = createChart("ppgChart", "PPG", "blue");
         const ecgChart = createChart("ecgChart", "ECG", "green");
 
         function addData(chart, x, y) {
             chart.data.labels.push(x);
-            chart.data.datasets[0].data.push({
-                x,
-                y
-            });
+            chart.data.datasets[0].data.push({ x, y });
 
-            if (chart.data.labels.length > 2000) {
+            if (chart.data.labels.length > 1000) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
             }
@@ -189,7 +185,6 @@
         }
 
         function updateAverages() {
-            document.getElementById("ppgAvg").textContent = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
             document.getElementById("ecgAvg").textContent = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
         }
 
@@ -219,27 +214,15 @@
             socket = new WebSocket("ws://127.0.0.1:8000");
 
             socket.onmessage = (event) => {
-                const line = event.data.trim(); // Expected format: "512,450,100"
-                const [ppg, ecg] = line.split(",").map(Number);
+                const ecg = Number(event.data.trim());
 
-                addData(ppgChart, timeIndex, ppg);
                 addData(ecgChart, timeIndex, ecg);
+                sensorData.push({ time: timeIndex, ecg });
 
-                sensorData.push({
-                    time: timeIndex,
-                    ppg,
-                    ecg
-                });
-                timeIndex++;
-
-                // Update running sums and counts
-                ppgSum += ppg;
-                ppgCount++;
+                timeIndex += 1; // Treat each step as 10ms, adjust scale accordingly
                 ecgSum += ecg;
                 ecgCount++;
                 updateAverages();
-
-
             };
 
             socket.onerror = (err) => {
@@ -263,68 +246,26 @@
             stopTimer();
         }
 
-        /*function submitAverages() {
-            const ppgAverage = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
-            const ecgAverage = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
-
-            // Prepare data to send
-            const data = {
-                ppgAverage: ppgAverage,
-                ecgAverage: ecgAverage
-            };
-
-            // Example: POST to /submit-averages (adjust URL as needed)
-            fetch('/submit-averages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                })
-                .then(response => {
-                    if (response.ok) {
-                        alert('Averages submitted successfully!');
-                    } else {
-                        alert('Failed to submit averages.');
-                    }
-                })
-                .catch(error => {
-                    alert('Error submitting averages: ' + error);
-                });
-        }*/
-
         function submitAverages() {
-            const ppgAverage = ppgCount ? Math.round(ppgSum / ppgCount) : 0;
             const ecgAverage = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
 
-            // Prepare data to send
-            const data = {
-                ppgAverage: ppgAverage,
-                ecgAverage: ecgAverage
-            };
+            const data = { ecgAverage: ecgAverage };
 
             fetch('http://capstonespring2025.duckdns.org:8080/capstonepanel2025/upload.php', {
-                
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                })
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
                 .then(response => response.text())
-                .then(result => {
-                    alert(result);
-                })
-                .catch(error => {
-                    alert('Error submitting averages: ' + error);
-                });
+                .then(result => alert(result))
+                .catch(error => alert('Error submitting averages: ' + error));
         }
-
 
         document.getElementById("startBtn").addEventListener("click", startStream);
         document.getElementById("stopBtn").addEventListener("click", stopStream);
 
-        // Set initial button states, timer, and averages on page load
         setButtonStates();
         updateTimerDisplay();
         updateAverages();
