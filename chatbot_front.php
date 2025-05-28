@@ -127,7 +127,7 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
     loadingIndicator.style.display = "block";
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch("http://localhost:8888/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })

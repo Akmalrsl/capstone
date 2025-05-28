@@ -3,19 +3,21 @@ import asyncio
 import websockets
 
 # Update your port and baud rate
-ser = serial.Serial('COM13', 9600)
-
-connected_clients = set()
+ser = serial.Serial('COM11', 9600)
 
 async def send_serial_data(websocket):
-    connected_clients.add(websocket)
     try:
         while True:
+            # Read a line from the serial port
             line = ser.readline().decode().strip()
+            
+            # Send the ECG value directly (assuming it's just one number)
             await websocket.send(line)
-            await asyncio.sleep(0.01) #0.01
+
+            # Add a slight delay to avoid flooding
+            await asyncio.sleep(0.01)
     except websockets.exceptions.ConnectionClosed:
-        connected_clients.remove(websocket)
+        print("Client disconnected")
 
 async def main():
     async with websockets.serve(send_serial_data, "127.0.0.1", 8000):
