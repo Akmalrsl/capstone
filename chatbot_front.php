@@ -135,7 +135,7 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
       const data = await response.json();
       appendMessage(data.reply, "bot-msg");
     } catch (err) {
-      appendMessage("⚠️ Failed to get response. Please try again.", "bot-msg");
+      appendMessage("Failed to get response. Please try again.", "bot-msg");
     }
 
     loadingIndicator.style.display = "none";
