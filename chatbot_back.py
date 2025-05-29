@@ -34,7 +34,7 @@ def get_user_from_db(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
         return result
     except Exception as e:
-        print("❌ DB error:", e)
+        print("DB error:", e)
         return None
 
 def get_hypertension_risk(user_id: int) -> Optional[int]:
@@ -59,7 +59,7 @@ def get_hypertension_risk(user_id: int) -> Optional[int]:
         conn.close()
         return result[0] if result else None
     except Exception as e:
-        print("❌ Error fetching prediction:", e)
+        print("Error fetching prediction:", e)
         return None
 
 def get_latest_meal_plan(user_id: int) -> Optional[Dict[str, Any]]:
@@ -84,7 +84,7 @@ def get_latest_meal_plan(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
         return result
     except Exception as e:
-        print("❌ Error fetching meal plan:", e)
+        print("Error fetching meal plan:", e)
         return None
 
 def save_meal_plan(user_id: int, plan_text: str, total_cal: int, carbs: float, protein: float, fat: float):
@@ -104,7 +104,7 @@ def save_meal_plan(user_id: int, plan_text: str, total_cal: int, carbs: float, p
         cursor.close()
         conn.close()
     except Exception as e:
-        print("❌ Failed to save meal plan:", e)
+        print("Failed to save meal plan:", e)
 
 def build_prompt(user: Dict[str, Any], prediction: Optional[int]) -> str:
     prediction_comment = (
@@ -158,13 +158,13 @@ def chat():
         if user_input.lower() in ["reset", "clear history"]:
             chat_history[session_id] = []
             latest_meal_plan[session_id] = ""
-            return jsonify({"reply": "✅ Chat history cleared."})
+            return jsonify({"reply": "Chat history cleared."})
 
         if any(kw in user_input.lower() for kw in ["repeat meal", "my meal plan", "send back meal", "repeat the plan"]):
             if latest_meal_plan[session_id]:
                 return jsonify({"reply": latest_meal_plan[session_id]})
             else:
-                return jsonify({"reply": "❌ No previous meal plan found. Try something like 'id 22' first."})
+                return jsonify({"reply": "No previous meal plan found. Try something like 'id 22' first."})
 
         match = re.search(r'id (\d+)', user_input.lower())
         force_new = re.search(r'new meal for id (\d+)', user_input.lower())
@@ -176,7 +176,7 @@ def chat():
             if not force_generate:
                 existing_plan = get_latest_meal_plan(user_id)
                 if existing_plan:
-                    return jsonify({"reply": f"📋 A meal plan already exists for this user.\n\nIf you want a new one, just type: 'new meal for id {user_id}'.\nTo see the old one again, type: 'repeat meal'."})
+                    return jsonify({"reply": f"A meal plan already exists for this user.\n\nIf you want a new one, just type: 'new meal for id {user_id}'.\nTo see the old one again, type: 'repeat meal'."})
 
             user_data = get_user_from_db(user_id)
             if not user_data:
@@ -231,9 +231,9 @@ def chat():
                 final_reply += "\n"
 
             if prediction == 1:
-                final_reply = "⚠️ This user is at high risk of hypertension. Suggested meal plan is designed to reduce sodium and saturated fats.\n\n" + final_reply
+                final_reply = "This user is at high risk of hypertension. Suggested meal plan is designed to reduce sodium and saturated fats.\n\n" + final_reply
             elif prediction == 0:
-                final_reply = "✅ This user is at low risk of hypertension. Here's a balanced meal plan.\n\n" + final_reply
+                final_reply = "This user is at low risk of hypertension. Here's a balanced meal plan.\n\n" + final_reply
 
             final_reply += f"Total Calories: {round(total_cal)} kcal\n"
             final_reply += "Estimated Macronutrient Breakdown:\n"
@@ -266,7 +266,7 @@ def chat():
 
     except Exception as e:
         print("🔥 Error in /chat route:", e)
-        return jsonify({"reply": f"❌ Server error: {str(e)}"}), 500
+        return jsonify({"reply": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(port=8888, debug=True)
