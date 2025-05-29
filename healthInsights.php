@@ -58,6 +58,15 @@ if (isset($_GET['patient_id'])) {
          body {
             background-color: #e0e0e0;
         }
+
+        .medical-report-box{
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            margin-top: 80px;
+        }
+
     </style>
 </head>
 <body>
@@ -89,7 +98,7 @@ if (isset($_GET['patient_id'])) {
         </div>
     </nav>
 
-    <div class= "form-section mx-auto col-md-8 text-center">
+    <div class="medical-report-box mx-auto col-md-8 text-center">
         <h2>Select Patient ID</h2>
         <form method="get">
             <select name="patient_id" required>
