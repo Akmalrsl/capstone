@@ -165,23 +165,15 @@ include 'db_connect.php';
                     <p>Healthmate provides innovative solutions for early detection and monitoring of cardiovascular health through smart technology integration.</p>
                 </div>
 
-                <div class="col-md-4 mb-3">
-                    <h5>Quick Links</h5>
-                    <ul class="list-unstyled">
-                        <li><a href="#" class="text-dark text-decoration-none">Home</a></li>
-                        <li><a href="#" class="text-dark text-decoration-none">About Us</a></li>
-                        <li><a href="#" class="text-dark text-decoration-none">Services</a></li>
-                        <li><a href="#" class="text-dark text-decoration-none">Doctors</a></li>
-                        <li><a href="#" class="text-dark text-decoration-none">Contact</a></li>
-                    </ul>
+                <div class="col-md-4 mb-3">  
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <h5>Contact Information</h5>
                     <p>
-                        📍 123 Street, City, Country<br>
-                        📧 contact@healthmate.com<br>
-                        📞 +8210 0000 0000
+                        📍 123 Street, Seoul, South Korea<br>
+                        📧 healthmate@gmail.com<br>
+                        📞 +8210 1234 5678
                     </p>
                 </div>
             </div>
