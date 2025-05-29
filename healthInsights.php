@@ -40,6 +40,16 @@ if (isset($_GET['patient_id'])) {
             $prediction = ['result' => 'Error contacting Flask API: ' . curl_error($curl)];
         } else {
             $prediction = json_decode($response, true);
+            
+            if (isset($prediction['prediction'])) {
+                $pred_val = (int)$prediction['prediction'];
+                $insert_sql = "INSERT INTO predictions (health_data_id, prediction_value) VALUES (?, ?)";
+                $stmt = $conn->prepare($insert_sql);
+                $stmt->bind_param("ii", $patient_id, $pred_val);
+                $stmt->execute();
+                $stmt->close();
+            }
+
         }
         curl_close($curl);
     } else {
@@ -65,6 +75,10 @@ if (isset($_GET['patient_id'])) {
             border-radius: 12px;
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
             margin-top: 80px;
+        }
+
+        .user-data{
+            list-style-type : none;
         }
 
     </style>
@@ -113,21 +127,28 @@ if (isset($_GET['patient_id'])) {
         </form>
     
 
-    <?php if (isset($row)): ?>
-        <h2>Medical Report for Patient ID <?= htmlspecialchars($patient_id) ?></h2>
-        <ul>
-            <li>Gender: <?= htmlspecialchars($row['gender']) ?></li>
-            <li>Age: <?= htmlspecialchars($row['age']) ?></li>
-            <li>Cholesterol Level: <?= htmlspecialchars($row['cholesterol_level']) ?></li>
-            <li>Systolic BP: <?= htmlspecialchars($row['systolicbp']) ?></li>
-            <li>Diastolic BP: <?= htmlspecialchars($row['diastolicbp']) ?></li>
-            <li>BMI: <?= htmlspecialchars($row['bmi']) ?></li>
-        </ul>
-        <h3>AI Prediction:</h3>
-        <p><?= $prediction['prediction'] ?? 'Prediction not available' ?></p>
-    <?php elseif (isset($error)): ?>
-        <p style="color:red;"><?= htmlspecialchars($error) ?></p>
-    <?php endif; ?>
+        <?php if (isset($row)): ?>
+            <h2>Medical Report for Patient ID <?= htmlspecialchars($patient_id) ?></h2>
+            <ul class="user-data">
+                <li><strong>Gender:</strong> <?= htmlspecialchars($row['gender']) ?></li>
+                <li><strong>Age:</strong> <?= htmlspecialchars($row['age']) ?></li>
+                <li><strong>Cholesterol Level:</strong> <?= htmlspecialchars($row['cholesterol_level']) ?></li>
+                <li><strong>Systolic BP:</strong> <?= htmlspecialchars($row['systolicbp']) ?></li>
+                <li><strong>Diastolic BP:</strong> <?= htmlspecialchars($row['diastolicbp']) ?></li>
+                <li><strong>BMI:</strong> <?= htmlspecialchars($row['bmi']) ?></li>
+            </ul>
+            <h3>AI Prediction</h3>
+            <?php if (isset($prediction['prediction'])): ?>
+                <p><strong>Risk of Hypertension:</strong> <?= $prediction['prediction'] == 1 ? 'High' : 'Low' ?></p>
+            <?php else: ?>
+                 <p>Prediction not available</p>
+            <?php endif; ?>
+
+        <?php elseif (isset($error)): ?>
+            <p style="color:red;"><?= htmlspecialchars($error) ?></p>
+        <?php endif; ?>
     </div>
+
+    
 </body>
 </html>
