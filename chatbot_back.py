@@ -18,7 +18,6 @@ NUTRITIONIX_API_KEY = "dc80bad1093e3611d655bb6f0f0b4579"
 chat_history: DefaultDict[str, List[Dict[str, str]]] = defaultdict(list)
 latest_meal_plan: DefaultDict[str, str] = defaultdict(str)
 
-
 def get_user_from_db(user_id: int) -> Optional[Dict[str, Any]]:
     try:
         conn = mysql.connector.connect(
@@ -35,9 +34,33 @@ def get_user_from_db(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
         return result
     except Exception as e:
-        print("❌ DB error:", e)
+        print("DB error:", e)
         return None
 
+def get_hypertension_risk(user_id: int) -> Optional[int]:
+    try:
+        conn = mysql.connector.connect(
+            host="capstonespring2025.duckdns.org",
+            user="Capstone",
+            password="Capstone123",
+            database="healthmate"
+        )
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.prediction_value
+            FROM predictions p
+            JOIN health_data h ON p.health_data_id = h.id
+            WHERE h.id = %s
+            ORDER BY p.prediction_time DESC
+            LIMIT 1
+        """, (user_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print("Error fetching prediction:", e)
+        return None
 
 def get_latest_meal_plan(user_id: int) -> Optional[Dict[str, Any]]:
     try:
@@ -61,15 +84,13 @@ def get_latest_meal_plan(user_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
         return result
     except Exception as e:
-        print("❌ Error fetching meal plan:", e)
+        print("Error fetching meal plan:", e)
         return None
-
 
 def save_meal_plan(user_id: int, plan_text: str, total_cal: int, carbs: float, protein: float, fat: float):
     try:
         conn = mysql.connector.connect(
             host="capstonespring2025.duckdns.org",
-            port=3306,
             user="Capstone",
             password="Capstone123",
             database="healthmate"
@@ -83,10 +104,16 @@ def save_meal_plan(user_id: int, plan_text: str, total_cal: int, carbs: float, p
         cursor.close()
         conn.close()
     except Exception as e:
-        print("❌ Failed to save meal plan:", e)
+        print("Failed to save meal plan:", e)
 
+def build_prompt(user: Dict[str, Any], prediction: Optional[int]) -> str:
+    prediction_comment = (
+        "The user is at high risk of hypertension. Avoid processed foods, excess salt, and saturated fat. "
+        "Prioritize fruits, vegetables, whole grains, and lean protein."
+        if prediction == 1 else
+        "The user has low risk of hypertension. A general balanced diet is suitable."
+    )
 
-def build_prompt(user: Dict[str, Any]) -> str:
     return f"""
 You are a certified nutritionist chatbot.
 
@@ -98,6 +125,8 @@ This is the health profile of a user:
 - BMI: {round(float(user["bmi"]), 2)}
 - Blood Pressure: {user["systolicbp"]}/{user["diastolicbp"]}
 - Cholesterol Level: {user["cholesterol_level"]}
+
+{prediction_comment}
 
 Based on this profile, generate a one-day meal plan. Format it like this:
 Breakfast:
@@ -116,7 +145,6 @@ Supper:
 Do not include explanations, quantities, or numbers. Only return the food names.
 """
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
@@ -130,33 +158,34 @@ def chat():
         if user_input.lower() in ["reset", "clear history"]:
             chat_history[session_id] = []
             latest_meal_plan[session_id] = ""
-            return jsonify({"reply": "✅ Chat history cleared."})
+            return jsonify({"reply": "Chat history cleared."})
 
         if any(kw in user_input.lower() for kw in ["repeat meal", "my meal plan", "send back meal", "repeat the plan"]):
             if latest_meal_plan[session_id]:
                 return jsonify({"reply": latest_meal_plan[session_id]})
             else:
-                return jsonify({"reply": "❌ No previous meal plan found. Try something like 'id 22' first."})
+                return jsonify({"reply": "No previous meal plan found. Try something like 'id 22' first."})
 
         match = re.search(r'id (\d+)', user_input.lower())
+        force_new = re.search(r'new meal for id (\d+)', user_input.lower())
+
         if match:
             user_id: int = int(match.group(1))
+            force_generate = bool(force_new and int(force_new.group(1)) == user_id)
 
-            # ✅ Check if user already has a meal plan
-            existing_plan = get_latest_meal_plan(user_id)
-            if existing_plan:
-                print(f"ℹ️ Returning saved meal plan for user {user_id}")
-                return jsonify({"reply": existing_plan["plan_text"]})
+            if not force_generate:
+                existing_plan = get_latest_meal_plan(user_id)
+                if existing_plan:
+                    return jsonify({"reply": f"A meal plan already exists for this user.\n\nIf you want a new one, just type: 'new meal for id {user_id}'.\nTo see the old one again, type: 'repeat meal'."})
 
-            # ✅ If not, generate a new one
             user_data = get_user_from_db(user_id)
             if not user_data:
                 return jsonify({"reply": "No user found with that ID."})
 
-            prompt = build_prompt(user_data)
+            prediction = get_hypertension_risk(user_id)
+            prompt = build_prompt(user_data, prediction)
             raw_plan: str = llm.invoke(prompt)
 
-            # Force consistent meal sections
             meal_items_by_section: Dict[str, List[str]] = {}
             expected_sections = ["Breakfast", "Lunch", "Dinner", "Supper"]
             for section in expected_sections:
@@ -201,6 +230,11 @@ def chat():
                         final_reply += f"- {item} (? kcal)\n"
                 final_reply += "\n"
 
+            if prediction == 1:
+                final_reply = "This user is at high risk of hypertension. Suggested meal plan is designed to reduce sodium and saturated fats.\n\n" + final_reply
+            elif prediction == 0:
+                final_reply = "This user is at low risk of hypertension. Here's a balanced meal plan.\n\n" + final_reply
+
             final_reply += f"Total Calories: {round(total_cal)} kcal\n"
             final_reply += "Estimated Macronutrient Breakdown:\n"
             final_reply += f"- Carbs: {round(carbs)}g\n"
@@ -209,7 +243,6 @@ def chat():
 
             latest_meal_plan[session_id] = final_reply.strip()
 
-            # Save to DB
             save_meal_plan(
                 user_id=user_id,
                 plan_text=latest_meal_plan[session_id],
@@ -221,7 +254,6 @@ def chat():
 
             return jsonify({"reply": latest_meal_plan[session_id]})
 
-        # Context-aware chat fallback
         chat_history[session_id].append({"role": "user", "content": user_input})
         context_prompt = "You are a helpful nutritionist chatbot. Continue this conversation:\n"
         for msg in chat_history[session_id][-6:]:
@@ -234,8 +266,7 @@ def chat():
 
     except Exception as e:
         print("🔥 Error in /chat route:", e)
-        return jsonify({"reply": f"❌ Server error: {str(e)}"}), 500
-
+        return jsonify({"reply": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(port=8888, debug=True)
