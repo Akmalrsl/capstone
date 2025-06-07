@@ -2,271 +2,264 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from langchain_ollama import OllamaLLM
 import mysql.connector
-import re
 import requests
+import re
+import logging
 from collections import defaultdict
-from typing import Dict, List, DefaultDict, Any, Optional, cast
+from typing import Dict, List, Optional, Any
 
-app = Flask(__name__)
-CORS(app)
-
-llm = OllamaLLM(model="phi:latest")
+# === CONFIGURATION ===
+MYSQL_HOST = "capstonespring2025.duckdns.org"
+MYSQL_USER = "Capstone"
+MYSQL_PASSWORD = "Capstone123"
+MYSQL_DB = "healthmate"
 
 NUTRITIONIX_APP_ID = "39ced4d8"
-NUTRITIONIX_API_KEY = "dc80bad1093e3611d655bb6f0f0b4579"
+NUTRITIONIX_API_KEY = "458858df7c3ee0909d5ce4684d1035c6"
 
-chat_history: DefaultDict[str, List[Dict[str, str]]] = defaultdict(list)
-latest_meal_plan: DefaultDict[str, str] = defaultdict(str)
+# === APP INIT ===
+app = Flask(__name__)
+CORS(app)
+logging.basicConfig(level=logging.INFO)
 
-def get_user_from_db(user_id: int) -> Optional[Dict[str, Any]]:
+llm = OllamaLLM(model="phi:latest")
+chat_history: Dict[str, List[str]] = defaultdict(list)
+latest_meal_plan: Dict[str, str] = defaultdict(str)
+last_user_id: Dict[str, int] = defaultdict(int)
+
+# === DB CONNECTION ===
+def get_db_conn() -> mysql.connector.connection.MySQLConnection:
+    return mysql.connector.connect(
+        host=MYSQL_HOST,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=MYSQL_DB,
+        port=3306
+    )
+
+def fetch_user(user_id: int) -> Optional[Dict[str, Any]]:
     try:
-        conn = mysql.connector.connect(
-            host="capstonespring2025.duckdns.org",
-            port=3306,
-            user="Capstone",
-            password="Capstone123",
-            database="healthmate"
-        )
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM health_data WHERE id = %s", (user_id,))
-        result = cast(Optional[Dict[str, Any]], cursor.fetchone())
-        cursor.close()
+        conn = get_db_conn()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM health_data WHERE id = %s", (user_id,))
+        result = cur.fetchone()
+        cur.close()
         conn.close()
         return result
-    except Exception as e:
-        print("❌ DB error:", e)
+    except Exception:
+        logging.exception("fetch_user failed")
         return None
 
-def get_hypertension_risk(user_id: int) -> Optional[int]:
+def fetch_hypertension_prediction(user_id: int) -> Optional[int]:
     try:
-        conn = mysql.connector.connect(
-            host="capstonespring2025.duckdns.org",
-            user="Capstone",
-            password="Capstone123",
-            database="healthmate"
-        )
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT p.prediction_value
-            FROM predictions p
-            JOIN health_data h ON p.health_data_id = h.id
-            WHERE h.id = %s
-            ORDER BY p.prediction_time DESC
-            LIMIT 1
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT prediction_value FROM predictions 
+            WHERE health_data_id = %s 
+            ORDER BY prediction_time DESC LIMIT 1
         """, (user_id,))
-        result = cursor.fetchone()
-        cursor.close()
+        result = cur.fetchone()
+        cur.close()
         conn.close()
         return result[0] if result else None
-    except Exception as e:
-        print("❌ Error fetching prediction:", e)
+    except Exception:
+        logging.exception("fetch_hypertension_prediction failed")
         return None
 
-def get_latest_meal_plan(user_id: int) -> Optional[Dict[str, Any]]:
+def save_plan(user_id: int, plan_text: str, cal: int, carbs: float, protein: float, fat: float) -> None:
     try:
-        conn = mysql.connector.connect(
-            host="capstonespring2025.duckdns.org",
-            port=3306,
-            user="Capstone",
-            password="Capstone123",
-            database="healthmate"
-        )
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT plan_text, total_calories, carbs, protein, fat 
-            FROM meal_plans 
-            WHERE user_id = %s 
-            ORDER BY created_at DESC 
-            LIMIT 1
-        """, (user_id,))
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return result
-    except Exception as e:
-        print("❌ Error fetching meal plan:", e)
-        return None
-
-def save_meal_plan(user_id: int, plan_text: str, total_cal: int, carbs: float, protein: float, fat: float):
-    try:
-        conn = mysql.connector.connect(
-            host="capstonespring2025.duckdns.org",
-            user="Capstone",
-            password="Capstone123",
-            database="healthmate"
-        )
-        cursor = conn.cursor()
-        cursor.execute("""
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO meal_plans (user_id, plan_text, total_calories, carbs, protein, fat)
             VALUES (%s, %s, %s, %s, %s, %s)
-        """, (user_id, plan_text, total_cal, carbs, protein, fat))
+        """, (user_id, plan_text, cal, carbs, protein, fat))
         conn.commit()
-        cursor.close()
+        cur.close()
         conn.close()
-    except Exception as e:
-        print("❌ Failed to save meal plan:", e)
+    except Exception:
+        logging.exception("save_plan failed")
 
-def build_prompt(user: Dict[str, Any], prediction: Optional[int]) -> str:
-    prediction_comment = (
-        "The user is at high risk of hypertension. Avoid processed foods, excess salt, and saturated fat. "
-        "Prioritize fruits, vegetables, whole grains, and lean protein."
-        if prediction == 1 else
-        "The user has low risk of hypertension. A general balanced diet is suitable."
+def fetch_latest_plan(user_id: int) -> Optional[Dict[str, Any]]:
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT plan_text, total_calories, carbs, protein, fat
+            FROM meal_plans
+            WHERE user_id = %s
+            ORDER BY created_at DESC LIMIT 1
+        """, (user_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result
+    except Exception:
+        logging.exception("fetch_latest_plan failed")
+        return None
+
+def build_prompt(user: Dict[str, Any], risk: Optional[int]) -> str:
+    comment = (
+        "The user is at high risk of hypertension. Recommend heart-healthy foods only. Avoid high sodium or processed food."
+        if risk == 1 else
+        "The user is at low risk of hypertension. Suggest a balanced and healthy diet."
     )
 
     return f"""
-You are a certified nutritionist chatbot.
+You are a certified nutritionist AI.
 
-This is the health profile of a user:
-- Age: {user["age"]}
-- Gender: {user["gender"]}
-- Height: {user["height"]} m
-- Weight: {user["weight"]} kg
-- BMI: {round(float(user["bmi"]), 2)}
-- Blood Pressure: {user["systolicbp"]}/{user["diastolicbp"]}
-- Cholesterol Level: {user["cholesterol_level"]}
+Health Profile:
+- Age: {user['age']}
+- Gender: {user['gender']}
+- Height: {user['height']} m
+- Weight: {user['weight']} kg
+- BMI: {round(float(user['bmi']), 2)}
+- Blood Pressure: {user['systolicbp']}/{user['diastolicbp']}
+- Cholesterol Level: {user['cholesterol_level']}
 
-{prediction_comment}
+{comment}
 
-Based on this profile, generate a one-day meal plan. Format it like this:
+👉 Generate a ONE-DAY meal plan using ONLY real food item names.
+
+⚠️ DO NOT include:
+- emojis
+- question marks
+- generic placeholders (e.g., "item", "thing", "A 1")
+- nutritional advice or extra commentary
+
+Use EXACTLY this format:
+
 Breakfast:
 - item 1
 - item 2
+
 Lunch:
 - item 1
 - item 2
+
 Dinner:
 - item 1
 - item 2
+
 Supper:
 - item 1
 - item 2
+""".strip()
 
-Do not include explanations, quantities, or numbers. Only return the food names.
-"""
+
 
 @app.route("/chat", methods=["POST"])
-def chat():
+def chat() -> Any:
     try:
-        data: Dict[str, Any] = request.get_json()
-        user_input: str = data.get("message", "").strip()
-        session_id: str = "default"
+        data = request.get_json()
+        msg = data.get("message", "").strip()
+        session_id = str(data.get("session_id", request.remote_addr))
 
-        if not user_input:
-            return jsonify({"reply": "Invalid input."}), 400
+        if not msg:
+            return jsonify({"reply": "Please enter a message."})
 
-        if user_input.lower() in ["reset", "clear history"]:
-            chat_history[session_id] = []
-            latest_meal_plan[session_id] = ""
-            return jsonify({"reply": "✅ Chat history cleared."})
+        if msg.lower() == "repeat":
+            user_id = last_user_id.get(session_id)
+            if not user_id:
+                return jsonify({"reply": "No previous user ID found in session."})
+            existing = fetch_latest_plan(user_id)
+            if not existing:
+                return jsonify({"reply": "No previous meal found in database."})
+            return jsonify({"reply": existing['plan_text']})
 
-        if any(kw in user_input.lower() for kw in ["repeat meal", "my meal plan", "send back meal", "repeat the plan"]):
-            if latest_meal_plan[session_id]:
-                return jsonify({"reply": latest_meal_plan[session_id]})
-            else:
-                return jsonify({"reply": "❌ No previous meal plan found. Try something like 'id 22' first."})
+        if msg.lower() == "new":
+            user_id = last_user_id.get(session_id)
+            if not user_id:
+                return jsonify({"reply": "No previous user ID found in session."})
+            return generate_new_meal(user_id, session_id)
 
-        match = re.search(r'id (\d+)', user_input.lower())
-        force_new = re.search(r'new meal for id (\d+)', user_input.lower())
-
+        match = re.search(r'id (\d+)', msg.lower())
         if match:
-            user_id: int = int(match.group(1))
-            force_generate = bool(force_new and int(force_new.group(1)) == user_id)
+            user_id = int(match.group(1))
+            last_user_id[session_id] = user_id
+            existing = fetch_latest_plan(user_id)
+            if existing:
+                return jsonify({"reply": "A meal plan already exists.\nType 'repeat' to reuse it or 'new' to generate a new one."})
+            return generate_new_meal(user_id, session_id)
 
-            if not force_generate:
-                existing_plan = get_latest_meal_plan(user_id)
-                if existing_plan:
-                    return jsonify({"reply": f"📋 A meal plan already exists for this user.\n\nIf you want a new one, just type: 'new meal for id {user_id}'.\nTo see the old one again, type: 'repeat meal'."})
+        return jsonify({"reply": "Please enter a valid command, such as 'id 1'."})
 
-            user_data = get_user_from_db(user_id)
-            if not user_data:
-                return jsonify({"reply": "No user found with that ID."})
+    except Exception:
+        logging.exception("CHAT ERROR")
+        return jsonify({"reply": "Server error occurred."}), 500
 
-            prediction = get_hypertension_risk(user_id)
-            prompt = build_prompt(user_data, prediction)
-            raw_plan: str = llm.invoke(prompt)
+def generate_new_meal(user_id: int, session_id: str) -> Any:
+    user = fetch_user(user_id)
+    if not user:
+        return jsonify({"reply": "User not found."})
 
-            meal_items_by_section: Dict[str, List[str]] = {}
-            expected_sections = ["Breakfast", "Lunch", "Dinner", "Supper"]
-            for section in expected_sections:
-                meal_items_by_section[section] = []
+    risk = fetch_hypertension_prediction(user_id)
+    prompt = build_prompt(user, risk)
+    plan = llm.invoke(prompt)
 
-            sections = re.split(r"(Breakfast:|Lunch:|Dinner:|Supper:)", raw_plan)
-            for i in range(1, len(sections), 2):
-                label = sections[i].strip().replace(":", "")
-                items_block = sections[i + 1].strip()
-                lines = [line.strip("- ").strip() for line in items_block.splitlines() if line.strip()]
-                meal_items_by_section[label] = lines
+    sections = re.split(r"(Breakfast:|Lunch:|Dinner:|Supper:)", plan)
+    meals: Dict[str, List[str]] = {"Breakfast": [], "Lunch": [], "Dinner": [], "Supper": []}
+    for i in range(1, len(sections), 2):
+        label = sections[i].strip(':\n ')
+        items = [line.strip('- ').strip() for line in sections[i + 1].splitlines() if line.strip()]
+        meals[label] = items
 
-            all_items: List[str] = [item for sublist in meal_items_by_section.values() for item in sublist]
+    all_items = [
+    item for sub in meals.values() for item in sub
+    if item and re.search(r'[a-zA-Z]', item) and "?" not in item and len(item) > 3
+]
 
-            nutri_resp = requests.post(
-                "https://trackapi.nutritionix.com/v2/natural/nutrients",
-                headers={
-                    "x-app-id": NUTRITIONIX_APP_ID,
-                    "x-app-key": NUTRITIONIX_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={"query": ", ".join(all_items)}
-            )
-            nutri_resp.raise_for_status()
-            foods_data = nutri_resp.json().get("foods", [])
+    if not all_items:
+        return jsonify({"reply": "No meal items found to send to Nutritionix."})
 
-            final_reply = ""
-            total_cal, carbs, protein, fat = 0, 0, 0, 0
+    nutri_response = requests.post(
+        "https://trackapi.nutritionix.com/v2/natural/nutrients",
+        headers={
+            "x-app-id": NUTRITIONIX_APP_ID,
+            "x-app-key": NUTRITIONIX_API_KEY,
+            "Content-Type": "application/json"
+        },
+        json={"query": ", ".join(all_items)},
+        timeout=10
+    )
 
-            for label in expected_sections:
-                final_reply += f"{label}:::\n"
-                for item in meal_items_by_section[label]:
-                    match_food = next((f for f in foods_data if f["food_name"].lower() in item.lower()), None)
-                    if match_food:
-                        kcal = round(match_food["nf_calories"])
-                        total_cal += match_food["nf_calories"]
-                        carbs += match_food.get("nf_total_carbohydrate", 0)
-                        protein += match_food.get("nf_protein", 0)
-                        fat += match_food.get("nf_total_fat", 0)
-                        final_reply += f"- {match_food['food_name'].capitalize()} ({kcal} kcal)\n"
-                    else:
-                        final_reply += f"- {item} (? kcal)\n"
-                final_reply += "\n"
+    if nutri_response.status_code != 200:
+        return jsonify({"reply": f"Nutritionix API failed. Status: {nutri_response.status_code}"}), 500
 
-            if prediction == 1:
-                final_reply = "⚠️ This user is at high risk of hypertension. Suggested meal plan is designed to reduce sodium and saturated fats.\n\n" + final_reply
-            elif prediction == 0:
-                final_reply = "✅ This user is at low risk of hypertension. Here's a balanced meal plan.\n\n" + final_reply
+    nutri = nutri_response.json().get("foods", [])
+    if not nutri:
+        return jsonify({"reply": "No nutritional data found for the items."}), 500
 
-            final_reply += f"Total Calories: {round(total_cal)} kcal\n"
-            final_reply += "Estimated Macronutrient Breakdown:\n"
-            final_reply += f"- Carbs: {round(carbs)}g\n"
-            final_reply += f"- Protein: {round(protein)}g\n"
-            final_reply += f"- Fat: {round(fat)}g"
+    risk_msg = (
+        "☒ This user is at **high risk of hypertension**. Here's a heart-friendly meal plan.\n\n"
+        if risk == 1
+        else "✅ This user is at **low risk of hypertension**. Here's a balanced meal plan.\n\n"
+    )
 
-            latest_meal_plan[session_id] = final_reply.strip()
+    reply = risk_msg
+    total_cal = carbs = protein = fat = 0
+    for label in meals:
+        reply += f"{label}:::\n"
+        for item in meals[label]:
+            match = next((f for f in nutri if f["food_name"].lower() in item.lower()), None)
+            if match:
+                kcal = round(match["nf_calories"])
+                reply += f"- {match['food_name'].capitalize()} ({kcal} kcal)\n"
+                total_cal += match["nf_calories"]
+                carbs += match["nf_total_carbohydrate"]
+                protein += match["nf_protein"]
+                fat += match["nf_total_fat"]
+            else:
+                reply += f"- {item} (? kcal)\n"
+        reply += "\n"
 
-            save_meal_plan(
-                user_id=user_id,
-                plan_text=latest_meal_plan[session_id],
-                total_cal=round(total_cal),
-                carbs=round(carbs),
-                protein=round(protein),
-                fat=round(fat)
-            )
+    reply += f"Total Calories: {round(total_cal)} kcal\n"
+    reply += f"Carbs: {round(carbs)}g | Protein: {round(protein)}g | Fat: {round(fat)}g"
 
-            return jsonify({"reply": latest_meal_plan[session_id]})
-
-        chat_history[session_id].append({"role": "user", "content": user_input})
-        context_prompt = "You are a helpful nutritionist chatbot. Continue this conversation:\n"
-        for msg in chat_history[session_id][-6:]:
-            context_prompt += f"{msg['role'].capitalize()}: {msg['content']}\n"
-        context_prompt += "Assistant:"
-
-        response: str = llm.invoke(context_prompt)
-        chat_history[session_id].append({"role": "assistant", "content": response})
-        return jsonify({"reply": response})
-
-    except Exception as e:
-        print("🔥 Error in /chat route:", e)
-        return jsonify({"reply": f"❌ Server error: {str(e)}"}), 500
+    latest_meal_plan[session_id] = reply.strip()
+    save_plan(user_id, reply.strip(), round(total_cal), round(carbs), round(protein), round(fat))
+    return jsonify({"reply": reply.strip()})
 
 if __name__ == "__main__":
-    app.run(port=8888, debug=True)
+    app.run(debug=True)
