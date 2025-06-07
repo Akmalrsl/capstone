@@ -3,7 +3,7 @@ import asyncio
 import websockets
 
 # Update your port and baud rate
-ser = serial.Serial('COM11', 9600)
+ser = serial.Serial('COM12', 9600)
 
 async def send_serial_data(websocket):
     try:
