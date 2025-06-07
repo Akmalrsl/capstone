@@ -5,6 +5,7 @@ import websockets
 # Update your port and baud rate
 ser = serial.Serial('COM12', 9600)
 
+
 async def send_serial_data(websocket):
     try:
         while True:
