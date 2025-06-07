@@ -127,7 +127,7 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
     loadingIndicator.style.display = "block";
 
     try {
-      const response = await fetch("http://localhost:8888/chat", {
+      const response = await fetch("http://127.0.0.1:5000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })
@@ -135,8 +135,10 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
       const data = await response.json();
       appendMessage(data.reply, "bot-msg");
     } catch (err) {
-      appendMessage("Failed to get response. Please try again.", "bot-msg");
+       console.error("❌ Fetch failed:", err);
+       appendMessage("Failed to get response. Please try again.", "bot-msg");
     }
+
 
     loadingIndicator.style.display = "none";
     chatBox.scrollTop = chatBox.scrollHeight;
