@@ -119,12 +119,12 @@
         // Replace with your actual formulas
         function calculateSystolic(ptt) {
             // For example, systolic decreases as ptt increases
-            return Math.round(210 - (ptt * 0.6));
+            return Math.round(210 - (ptt * 0.6) - 30);
         }
 
         function calculateDiastolic(ptt) {
             // For example, diastolic decreases as ptt increases but less than systolic
-            return Math.round(120 - (ptt * 0.3));
+            return Math.round(120 - (ptt * 0.3) - 5);
         }
 
         function fixCanvasHD(canvas) {
@@ -253,6 +253,12 @@
         }
 
         function startStream() {
+            ecgSum = 0;
+            ecgCount = 0;
+            systolicSum = 0;
+            systolicCount = 0;
+            diastolicSum = 0;
+            diastolicCount = 0;
             if (streamStarted) return;
             streamStarted = true;
             setButtonStates();
@@ -332,20 +338,16 @@
 
         function submitAverages() {
             const ecgAverage = ecgCount ? Math.round(ecgSum / ecgCount) : 0;
-            const systolicAverage = systolicCount ? Math.round(systolicSum / systolicCount) : 0;
-            const diastolicAverage = diastolicCount ? Math.round(diastolicSum / diastolicCount) : 0;
+            const sbp = systolicCount ? Math.round(systolicSum / systolicCount) : 0;
+            const dbp = diastolicCount ? Math.round(diastolicSum / diastolicCount) : 0;
 
             const data = {
 
-                /*
-                ecgAverage: ecgAverage,
-                systolicAverage: systolicAverage,
-                diastolicAverage: diastolicAverage
-                */
 
-                ecgAverage: 1,
-                systolicAverage: 1,
-                diastolicAverage: 1
+                ecgAverage: ecgAverage,
+                sbp: sbp,
+                dbp: dbp
+
             };
 
             fetch('http://capstonespring2025.duckdns.org/capstonepanel2025/upload.php', {
