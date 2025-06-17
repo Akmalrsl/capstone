@@ -1,5 +1,6 @@
 # Ignore Python virtual environments
 predictor/
+data_analysis/
 
 # Ignore environment variable files
 .env
