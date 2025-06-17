@@ -118,9 +118,9 @@ include 'db_connect.php';
             <div class="row mt-5">
                 <div class="col-md-4">
                     <div class="feature-card">
-                        <h5>Manual Testing</h5>
-                        <p>Test yourself by entering your health data manually.</p>
-                        <a href="manualTest.php" class="btn btn-primary mt-2">Start Testing</a>
+                        <h5>Heart Rate & BP Detector</h5>
+                        <p>Monitors heart rate and blood pressure in real-time.</p>
+                        <a href="liveSensor.php" class="btn btn-primary mt-2">Start Testing</a>
                     </div>
                 </div>
 
