@@ -48,6 +48,7 @@ while ($row = $result->fetch_assoc()) {
 
     if ($systolic === null && $diastolic === null) continue;
 
+    //filter based on age
     if ($age < 20) $group = "10-19";
     elseif ($age < 30) $group = "20-29";
     elseif ($age < 40) $group = "30-39";
@@ -89,6 +90,7 @@ $statsQuery = "SELECT
 $statsResult = $health_conn->query($statsQuery);
 $stats = $statsResult->fetch_assoc();
 
+//list of high risks
 $riskQuery = "SELECT age, gender, systolicbp, diastolicbp, cholesterol_level 
               FROM health_data 
               WHERE (systolicbp > 130 OR diastolicbp > 90) 
