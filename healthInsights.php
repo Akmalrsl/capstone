@@ -16,7 +16,32 @@ if (isset($_GET['patient_id'])) {
     $result = $conn->query($sql);
 
     if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
+        $row = $result->fetch_assoc(); //fetch data from database
+
+        //original features
+        $gender = ($row['gender'] === 'male') ? 1 : 0;
+        $age = (int)$row['age'];
+        $cholesterol = (int)$row['cholesterol_level'];
+        $systolic = (float)$row['systolicbp'];
+        $diastolic = (float)$row['diastolicbp'];
+        $bmi = (float)$row['bmi'];
+
+        // Engineered features
+        $pulse_pressure = $systolic - $diastolic;
+        $bp_ratio = ($diastolic != 0) ? $systolic / $diastolic : 0;
+        $age_bmi_index = $age * $bmi;
+        $cholesterol_flag = ($cholesterol == 3) ? 1 : 0;  
+        
+         if ($bmi < 18.5) {
+            $bmi_category = 0;
+        } elseif ($bmi < 25) {
+            $bmi_category = 1;
+        } elseif ($bmi < 30) {
+            $bmi_category = 2;
+        } else {
+            $bmi_category = 3;
+        }
+            
 
         // Prepare data to send to Flask
         $data = [
@@ -28,17 +53,17 @@ if (isset($_GET['patient_id'])) {
             'bmi' => (float)$row['bmi']
         ];
 
-        // Send data using cURL to Flask
-        $curl = curl_init('http://127.0.0.1:5000/predict');
+        //send data using curl to Flask
+        $curl = curl_init('http://127.0.0.1:5000/predict'); 
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($curl, CURLOPT_POST, true);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data)); //turns data into json format
 
-        $response = curl_exec($curl);
+        $response = curl_exec($curl); //send request
         if ($response === false) {
             $prediction = ['result' => 'Error contacting Flask API: ' . curl_error($curl)];
-        } else {
+        } else {    
             $prediction = json_decode($response, true);
             
             if (isset($prediction['prediction'])) {
