@@ -75,12 +75,15 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
       margin-top: 15px;
     }
 
-    input[type="text"] {
+    textarea {
       flex: 1;
       padding: 14px;
       font-size: 18px;
       border-radius: 8px 0 0 8px;
       border: 1px solid #ccc;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.5;
     }
 
     button {
@@ -104,9 +107,9 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
 
 <div class="chat-container">
   <div class="chat-box" id="chatBox"></div>
-  <div class="loading" id="loading" style="display: none;">⏳ Generating response...</div>
+  <div class="loading" id="loading" style="display: none;">Generating response...</div>
   <form id="chatForm">
-    <input type="text" id="userInput" placeholder="Type your message..." autocomplete="off" required>
+    <textarea id="userInput" placeholder="Type your message..." rows="2" required></textarea>
     <button type="submit">Send</button>
   </form>
 </div>
@@ -117,32 +120,51 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
   const userInput = document.getElementById("userInput");
   const loadingIndicator = document.getElementById("loading");
 
-  chatForm.onsubmit = async function(e) {
-    e.preventDefault();
-    const message = userInput.value.trim();
-    if (!message) return;
-
-    appendMessage(message, "user-msg");
-    userInput.value = "";
-    loadingIndicator.style.display = "block";
-
-    try {
-      const response = await fetch("http://127.0.0.1:5000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
-      });
-      const data = await response.json();
-      appendMessage(data.reply, "bot-msg");
-    } catch (err) {
-       console.error("❌ Fetch failed:", err);
-       appendMessage("Failed to get response. Please try again.", "bot-msg");
+  // Enable Shift+Enter for newline, Enter alone to submit
+  userInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault(); // prevent newline
+      chatForm.requestSubmit(); // simulate form submission
     }
+  });
 
+  chatForm.onsubmit = async function(e) {
+  e.preventDefault();
+  const message = userInput.value.trim();
+  if (!message) return;
 
-    loadingIndicator.style.display = "none";
-    chatBox.scrollTop = chatBox.scrollHeight;
-  };
+  appendMessage(message, "user-msg");
+  userInput.value = "";
+  loadingIndicator.style.display = "block";
+
+  // Generate session ID once and store it
+  let sessionId = localStorage.getItem("session_id");
+  if (!sessionId) {
+    sessionId = crypto.randomUUID(); // Generate unique session
+    localStorage.setItem("session_id", sessionId);
+  }
+
+  try {
+    const response = await fetch("http://127.0.0.1:5000/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: message,
+        session_id: sessionId
+      })
+    });
+
+    const data = await response.json();
+    appendMessage(data.reply, "bot-msg");
+  } catch (err) {
+    console.error("Fetch failed:", err);
+    appendMessage("Failed to get response. Please try again.", "bot-msg");
+  }
+
+  loadingIndicator.style.display = "none";
+  chatBox.scrollTop = chatBox.scrollHeight;
+};
+
 
   function appendMessage(message, className) {
     const div = document.createElement("div");

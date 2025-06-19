@@ -26,6 +26,7 @@ llm = OllamaLLM(model="phi:latest")
 chat_history: Dict[str, List[str]] = defaultdict(list)
 latest_meal_plan: Dict[str, str] = defaultdict(str)
 last_user_id: Dict[str, int] = defaultdict(int)
+greeted: Dict[str, bool] = defaultdict(bool)
 
 # === DB CONNECTION ===
 def get_db_conn() -> mysql.connector.connection.MySQLConnection:
@@ -120,9 +121,9 @@ Health Profile:
 
 {comment}
 
-👉 Generate a ONE-DAY meal plan using ONLY real food item names.
+Generate a ONE-DAY meal plan using ONLY real food item names.
 
-⚠️ DO NOT include:
+DO NOT include:
 - emojis
 - question marks
 - generic placeholders (e.g., "item", "thing", "A 1")
@@ -147,8 +148,6 @@ Supper:
 - item 2
 """.strip()
 
-
-
 @app.route("/chat", methods=["POST"])
 def chat() -> Any:
     try:
@@ -156,8 +155,19 @@ def chat() -> Any:
         msg = data.get("message", "").strip()
         session_id = str(data.get("session_id", request.remote_addr))
 
+        if not greeted[session_id]:
+            greeted[session_id] = True
+
         if not msg:
             return jsonify({"reply": "Please enter a message."})
+
+        if msg.lower() in ["hello", "hi", "hey"]:
+            return jsonify({"reply": "Hello I'm Nutritionist Chatbot for Healthmate. I can help you with anything, but if you want a meal suggestion, you need to enter ID to get a specific session."})
+
+        if msg.lower() in ["end session", "bye", "goodbye"]:
+            last_user_id.pop(session_id, None)
+            greeted[session_id] = False
+            return jsonify({"reply": "Session ended. Thank you for using the Nutritionist Chatbot."})
 
         if msg.lower() == "repeat":
             user_id = last_user_id.get(session_id)
@@ -174,16 +184,40 @@ def chat() -> Any:
                 return jsonify({"reply": "No previous user ID found in session."})
             return generate_new_meal(user_id, session_id)
 
+        if msg.lower().strip() in ["profile", "show profile", "display profile"]:
+            user_id = last_user_id.get(session_id)
+            if not user_id:
+                return jsonify({"reply": "No user profile found. Please enter your ID first like 'id 1'."})
+            user = fetch_user(user_id)
+            if user:
+                reply = (
+                    f"\U0001F464 User Profile\n"
+                    f"- ID: {user['id']}\n"
+                    f"- Age: {user['age']}\n"
+                    f"- Gender: {user['gender'].capitalize()}\n"
+                    f"- Height: {user['height']} m\n"
+                    f"- Weight: {user['weight']} kg\n"
+                    f"- BMI: {round(float(user['bmi']), 2)}\n"
+                    f"- Blood Pressure: {user['systolicbp']}/{user['diastolicbp']}\n"
+                    f"- Cholesterol Level: {user['cholesterol_level']}\n"
+                )
+                return jsonify({"reply": reply})
+            else:
+                return jsonify({"reply": "User profile not found."})
+
         match = re.search(r'id (\d+)', msg.lower())
         if match:
             user_id = int(match.group(1))
             last_user_id[session_id] = user_id
             existing = fetch_latest_plan(user_id)
             if existing:
-                return jsonify({"reply": "A meal plan already exists.\nType 'repeat' to reuse it or 'new' to generate a new one."})
-            return generate_new_meal(user_id, session_id)
+                return jsonify({"reply": f"You have entered ID {user_id}.\nA meal plan already exists.\nType 'repeat' to reuse it or 'new' to generate a new one.\nYou can also type 'show profile' to view your health data."})
+            else:
+                return generate_new_meal(user_id, session_id)
 
-        return jsonify({"reply": "Please enter a valid command, such as 'id 1'."})
+        llm_reply = llm.invoke(msg)
+        full_reply = llm_reply.strip()
+        return jsonify({"reply": full_reply})
 
     except Exception:
         logging.exception("CHAT ERROR")
@@ -206,9 +240,9 @@ def generate_new_meal(user_id: int, session_id: str) -> Any:
         meals[label] = items
 
     all_items = [
-    item for sub in meals.values() for item in sub
-    if item and re.search(r'[a-zA-Z]', item) and "?" not in item and len(item) > 3
-]
+        item for sub in meals.values() for item in sub
+        if item and re.search(r'[a-zA-Z]', item) and "?" not in item and len(item) > 3
+    ]
 
     if not all_items:
         return jsonify({"reply": "No meal items found to send to Nutritionix."})
@@ -232,9 +266,9 @@ def generate_new_meal(user_id: int, session_id: str) -> Any:
         return jsonify({"reply": "No nutritional data found for the items."}), 500
 
     risk_msg = (
-        "☒ This user is at **high risk of hypertension**. Here's a heart-friendly meal plan.\n\n"
+        "This user is at **high risk of hypertension**. Here's a heart-friendly meal plan.\n\n"
         if risk == 1
-        else "✅ This user is at **low risk of hypertension**. Here's a balanced meal plan.\n\n"
+        else "This user is at **low risk of hypertension**. Here's a balanced meal plan.\n\n"
     )
 
     reply = risk_msg

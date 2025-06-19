@@ -54,7 +54,7 @@ if (isset($_GET['patient_id'])) {
         ];
 
         //send data using curl to Flask
-        $curl = curl_init('http://127.0.0.1:5000/predict'); 
+        $curl = curl_init('http://127.0.0.1:5001/predict'); 
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($curl, CURLOPT_POST, true);

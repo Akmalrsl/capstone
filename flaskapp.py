@@ -47,4 +47,4 @@ def predict():
     return jsonify({'prediction': int(prediction)}) #changes to int format and send prediction value (0,1)
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(port=5001)
