@@ -5,13 +5,12 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
 session_start();
 
-// Include the database connection
+//include the database connection
 include 'db_connect.php';
 
 $error = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Check if $conn is set properly
     if (isset($conn)) {
         $email = $conn->real_escape_string($_POST['email']);
         $password = $_POST['password'];
@@ -22,7 +21,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($result && $result->num_rows === 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
-                // Store user info in session
+                //store user info in session
                 $_SESSION['user'] = [
                     'id' => $user['id'],
                     'username' => $user['username'],

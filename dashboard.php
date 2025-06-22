@@ -1,17 +1,15 @@
 <?php
 
 session_start();
-//Login required
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit;
 }
 
-//Get session info
+//get session info
 $username = $_SESSION['user']['username'];
 $role = $_SESSION['user']['role'];
 
-//DB connection
 include 'db_connect.php';
 ?>
 
@@ -61,7 +59,6 @@ include 'db_connect.php';
 </head>
 
 <body>
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
             <a class="navbar-brand" href="dashboard.php">Healthmate</a>
@@ -78,21 +75,19 @@ include 'db_connect.php';
                     <li class="nav-item"><a class="nav-link" href="logout.php">Logout</a></li>
                 </ul>
 
-                <!-- Replaced "Make an Appointment" with "Submit Health Info" -->
+                <!--replaced "Make an Appointment" with "Submit Health Info" -->
                 <a href="usersotherinfo.php" class="btn btn-success ms-3">Submit Health Info</a>
             </div>
         </div>
     </nav>
 
 
-    <!-- User Info -->
     <div class="container mt-2">
         <div class="user-info">
             Logged in as: <strong><?= htmlspecialchars($username) ?></strong> (<?= $role ?>)
         </div>
     </div>
 
-    <!-- Header -->
     <section class="header-section">
         <div class="container">
             <div class="row align-items-center">
@@ -114,7 +109,6 @@ include 'db_connect.php';
                 </div>
             </div>
 
-            <!-- Features Section -->
             <div class="row mt-5">
                 <div class="col-md-4">
                     <div class="feature-card">
@@ -156,7 +150,6 @@ include 'db_connect.php';
         </div>
     </section>
 
-    <!-- Footer -->
     <footer class="bg-light text-dark py-4 mt-5">
         <div class="container">
             <div class="row">
@@ -183,9 +176,8 @@ include 'db_connect.php';
         </div>
     </footer>
 
-    <!-- Font Awesome -->
     <script src="https://kit.fontawesome.com/a076d05399.js"></script>
-    <!-- Bootstrap JS -->
+    <!-- bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 

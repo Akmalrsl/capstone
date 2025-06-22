@@ -1,14 +1,14 @@
 <?php
-// Connect to database
+//connect to database
 $conn = new mysqli("capstonespring2025.duckdns.org", "Capstone", "Capstone123", "healthmate", 3306);
 if ($conn->connect_error) {
     die("Database connection failed: " . $conn->connect_error);
 }
 
-// Get all IDs for dropdown
+//get all IDs for dropdown
 $id_result = $conn->query("SELECT id FROM health_data ORDER BY id DESC");
 
-// If form is submitted
+//if form is submitted
 $prediction = null;
 if (isset($_GET['patient_id'])) {
     $patient_id = (int)$_GET['patient_id'];
@@ -26,7 +26,7 @@ if (isset($_GET['patient_id'])) {
         $diastolic = (float)$row['diastolicbp'];
         $bmi = (float)$row['bmi'];
 
-        // Engineered features
+        //engineered features
         $pulse_pressure = $systolic - $diastolic;
         $bp_ratio = ($diastolic != 0) ? $systolic / $diastolic : 0;
         $age_bmi_index = $age * $bmi;
@@ -43,7 +43,7 @@ if (isset($_GET['patient_id'])) {
         }
             
 
-        // Prepare data to send to Flask
+        //prepare data to send to Flask
         $data = [
             'gender' => ($row['gender'] === 'male') ? 1 : 0,
             'age' => (int)$row['age'],

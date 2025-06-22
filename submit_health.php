@@ -5,39 +5,37 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
-// Connect to online databases (healthmate + capstone_sensors)
+//connect to online databases (healthmate + capstone_sensors)
 include 'db_connect.php';
 
-// Ensure POST request
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     die("Invalid request method.");
 }
 
-// 1. Fetch latest ECG average from sensor_data table
+//fetch latest ECG average from sensor_data table
 $result = $sensor_conn->query("SELECT AVG(ecg) AS avg_ecg FROM sensor_data WHERE ecg IS NOT NULL AND created_at >= NOW() - INTERVAL 10 MINUTE");
 $row = $result->fetch_assoc();
 $avg_ecg = isset($row['avg_ecg']) ? (float)$row['avg_ecg'] : null;
 
-// 2. Decide whether to store as systolic or diastolic
+//store as systolic or diastolic
 $systolic = $avg_ecg > 100 ? $avg_ecg : null;
 $diastolic = $avg_ecg <= 100 ? $avg_ecg : null;
 
-// 3. Collect and sanitize form input
+//collect and sanitize form input
 $age = $_POST['age'];
 $gender = $_POST['gender'];
-$height = $_POST['height'] / 100; // convert cm to meters
+$height = $_POST['height'] / 100; //convert cm to meters
 $weight = $_POST['weight'];
 $cholesterol = $_POST['cholesterol'];
 
-// Safety check
 if ($height <= 0) {
     die("Height must be greater than zero.");
 }
 
-// 4. Calculate BMI
+//calculate BMI
 $bmi = $weight / ($height * $height);
 
-// 5. Prepare SQL insert
+//prepare SQL insert
 $sql = "INSERT INTO health_data (age, gender, height, weight, bmi, systolicbp, diastolicbp, cholesterol_level)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 $stmt = $health_conn->prepare($sql);
@@ -46,10 +44,6 @@ if ($stmt) {
     $stmt->bind_param("ssdddddd", $age, $gender, $height, $weight, $bmi, $systolic, $diastolic, $cholesterol);
     
     if ($stmt->execute()) {
-        // Optional: clear sensor_data if needed
-        // $sensor_conn->query("TRUNCATE TABLE sensor_data");
-
-        // Redirect to prediction page
         header("Location: prediction_result.php");
         exit();
     } else {
@@ -61,7 +55,6 @@ if ($stmt) {
     echo "Error preparing statement: " . $health_conn->error;
 }
 
-// Close both DB connections
 $health_conn->close();
 $sensor_conn->close();
 ?>

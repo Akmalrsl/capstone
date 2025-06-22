@@ -267,7 +267,7 @@
             socket = new WebSocket("ws://127.0.0.1:8000");
 
             socket.onmessage = (event) => {
-                // Expected data format: "ecg,ppg,ptt"
+                //expected data format: "ecg,ppg,ptt"
                 const parts = event.data.trim().split(",");
                 const ecg = Number(parts[0]);
                 const ppg = Number(parts[1]);
@@ -276,7 +276,7 @@
                 addData(ecgChart, timeIndex, ecg);
                 addData(ppgChart, timeIndex, ppg);
 
-                // Only proceed if ptt is a valid number
+                //only proceed if ptt is a valid number
                 if (!isNaN(ptt)) {
                     const systolic = calculateSystolic(ptt);
                     const diastolic = calculateDiastolic(ptt);

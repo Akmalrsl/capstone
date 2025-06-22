@@ -7,7 +7,7 @@ if (isset($_GET['id'])) {
     $result = $health_conn->query($query);
 
     if ($row = $result->fetch_assoc()) {
-        echo json_encode($row); // return all 3 values as JSON
+        echo json_encode($row); //return all 3 values as JSON
     } else {
         echo json_encode(["ecgAverage" => 0, "sbp" => 0, "dbp" => 0]);
     }

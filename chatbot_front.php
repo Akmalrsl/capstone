@@ -120,11 +120,11 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
   const userInput = document.getElementById("userInput");
   const loadingIndicator = document.getElementById("loading");
 
-  // Enable Shift+Enter for newline, Enter alone to submit
+  //enable Shift+Enter for newline, Enter alone to submit
   userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault(); // prevent newline
-      chatForm.requestSubmit(); // simulate form submission
+      e.preventDefault(); //prevent newline
+      chatForm.requestSubmit(); //simulate form submission
     }
   });
 
@@ -137,10 +137,10 @@ $username = $_SESSION['user']['username'] ?? 'Guest';
   userInput.value = "";
   loadingIndicator.style.display = "block";
 
-  // Generate session ID once and store it
+  //generate session ID once and store it
   let sessionId = localStorage.getItem("session_id");
   if (!sessionId) {
-    sessionId = crypto.randomUUID(); // Generate unique session
+    sessionId = crypto.randomUUID(); //generate unique session
     localStorage.setItem("session_id", sessionId);
   }
 

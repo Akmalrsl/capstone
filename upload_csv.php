@@ -3,19 +3,19 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
-include 'db_connect.php'; // ✅ Use online DB connection
+include 'db_connect.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['csv_file'])) {
     $file = $_FILES['csv_file']['tmp_name'];
 
     if (($handle = fopen($file, "r")) !== false) {
-        fgetcsv($handle); // Skip header
+        fgetcsv($handle);
 
         $successCount = 0;
         $failCount = 0;
 
         while (($data = fgetcsv($handle, 1000, ",")) !== false) {
-            if (count($data) < 8) continue; // Skip invalid rows
+            if (count($data) < 8) continue; //skip invalid rows
 
             $age = (int)$data[1];
             $gender = strtolower(trim($data[2]));

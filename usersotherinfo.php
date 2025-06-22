@@ -1,8 +1,7 @@
 <?php
-// Connect to DB
 include 'db_connect.php';
 
-// Fetch reading IDs from the 'readings' table
+//fetch reading IDs from the 'readings' table
 $readingOptions = "";
 $sql = "SELECT id FROM readings ORDER BY id DESC";
 $result = $health_conn->query($sql);
@@ -60,7 +59,6 @@ while ($row = $result->fetch_assoc()) {
 
 <body class="bg-light">
 
-    <!-- Success Popup -->
     <?php if (isset($_GET['success']) && $_GET['success'] == 1): ?>
         <script>
             alert("✅ Data successfully submitted!");
@@ -70,7 +68,6 @@ while ($row = $result->fetch_assoc()) {
         </script>
     <?php endif; ?>
 
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
             <a class="navbar-brand" href="dashboard.php">Healthmate</a>
@@ -87,7 +84,6 @@ while ($row = $result->fetch_assoc()) {
         </div>
     </nav>
 
-    <!-- Form -->
     <div class="container mt-5">
         <h2 class="mb-4">Submit Your Health Info</h2>
         <form action="process_userinfo.php" method="POST">

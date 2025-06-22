@@ -6,11 +6,11 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     die("Invalid request method.");
 }
 
-// 1. Get values from POST
+//get values from POST
 $sensor_id = $_POST['sensor_id'];
-$ecg = (float) $_POST['ecgAverage'];  // Optional: still capture if you want to store later
+$ecg = (float) $_POST['ecgAverage'];
 
-// Get SBP and DBP directly from the form
+//get SBP and DBP directly from the form
 $systolic = (float) $_POST['sbp'];
 $diastolic = (float) $_POST['dbp'];
 
@@ -20,16 +20,15 @@ $height_cm = (float) $_POST['height'];
 $weight = (float) $_POST['weight'];
 $cholesterol = (int) $_POST['cholesterol'];
 
-// Safety check
 if ($height_cm <= 0) {
     die("Height must be greater than zero.");
 }
 
-// BMI calculation
+//BMI calculation
 $height_m = $height_cm / 100;
 $bmi = $weight / ($height_m * $height_m);
 
-// 2. Insert into health_data
+//insert into health_data
 $stmt = $health_conn->prepare("
     INSERT INTO health_data (
         age, gender, height, weight, bmi,
@@ -39,7 +38,7 @@ $stmt = $health_conn->prepare("
 
 $stmt->bind_param("ssdddddd", $age, $gender, $height_m, $weight, $bmi, $systolic, $diastolic, $cholesterol);
 
-// 3. Execute and redirect
+//execute and redirect
 if ($stmt->execute()) {
     header("Location: usersotherinfo.php?success=1");
     exit();
@@ -48,7 +47,7 @@ if ($stmt->execute()) {
     exit();
 }
 
-// Cleanup
+
 $stmt->close();
 $health_conn->close();
 ?>
