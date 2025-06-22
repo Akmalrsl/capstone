@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from typing import Dict, List, Optional, Any
 
-# === CONFIGURATION ===
+#CONFIGURATION
 MYSQL_HOST = "capstonespring2025.duckdns.org"
 MYSQL_USER = "Capstone"
 MYSQL_PASSWORD = "Capstone123"
@@ -17,7 +17,7 @@ MYSQL_DB = "healthmate"
 NUTRITIONIX_APP_ID = "39ced4d8"
 NUTRITIONIX_API_KEY = "458858df7c3ee0909d5ce4684d1035c6"
 
-# === APP INIT ===
+#APP INIT
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +28,7 @@ latest_meal_plan: Dict[str, str] = defaultdict(str)
 last_user_id: Dict[str, int] = defaultdict(int)
 greeted: Dict[str, bool] = defaultdict(bool)
 
-# === DB CONNECTION ===
+#DB CONNECTION
 def get_db_conn() -> mysql.connector.connection.MySQLConnection:
     return mysql.connector.connect(
         host=MYSQL_HOST,
