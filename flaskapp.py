@@ -10,7 +10,7 @@ model.load_model("hypertension_catboost_Improved_v1.cbm")
 def predict():
     data = request.get_json()
 
-    #base input features
+    # Base input features
     gender = data['gender']
     age = data['age']
     cholesterol = data['cholesterol_level']
@@ -18,6 +18,7 @@ def predict():
     diastolic = data['diastolicbp']
     bmi = data['bmi']
 
+    # Engineered features
     pulse_pressure = systolic - diastolic
     bp_ratio = systolic / diastolic if diastolic != 0 else 0
     age_bmi_index = age * bmi
@@ -35,7 +36,7 @@ def predict():
 
     bmi_category = bmi_category_calc(bmi)
 
-    #all features in order
+    # All features in order
     features = [
         gender, age, cholesterol, systolic, diastolic, bmi,
         pulse_pressure, bp_ratio, age_bmi_index,
