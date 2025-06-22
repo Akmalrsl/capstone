@@ -167,6 +167,7 @@ def chat() -> Any:
         if msg.lower() in ["end session", "bye", "goodbye"]:
             last_user_id.pop(session_id, None)
             greeted[session_id] = False
+            chat_history.pop(session_id, None)
             return jsonify({"reply": "Session ended. Thank you for using the Nutritionist Chatbot."})
 
         if msg.lower() == "repeat":
@@ -215,8 +216,12 @@ def chat() -> Any:
             else:
                 return generate_new_meal(user_id, session_id)
 
-        llm_reply = llm.invoke(msg)
+        chat_history[session_id].append(f"User: {msg}")
+        context_prompt = "\n".join(chat_history[session_id][-10:]) + "\nBot:"
+        llm_reply = llm.invoke(context_prompt)
         full_reply = llm_reply.strip()
+        chat_history[session_id].append(f"Bot: {full_reply}")
+
         return jsonify({"reply": full_reply})
 
     except Exception:
